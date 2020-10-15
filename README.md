@@ -41,3 +41,9 @@ This prevents accessing the file system and will only log the top level score to
 ```
 npm run start -- --log-only
 ```
+
+##### `-t, --table`
+Log the results as a table where each test gets a new row. Using this option will only log the "performance" results in order to minimize the resulted table cells. This is useful with the `--repeat` option for easier analysis.
+```
+npm run start -- --table
+```
