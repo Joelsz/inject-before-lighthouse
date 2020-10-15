@@ -7,13 +7,15 @@ const {URL} = require('url');
 const fs = require('fs');
 const path = require('path');
 const glob = require("glob");
+const Table = require('cli-table');
 
 program
 	.option('-u, --url <url>', "The URL to be tested with Lighthouse.")
 	.option('-c, --cookie [key=value pairs...]', 'Sets a cookie on the page before executing Lighthouse.')
 	.option('-x, --css-no-animate', 'Inject CSS to block any animation on the page before executing Lighthouse.')
 	.option('-r, --repeat <times>', 'Repeats the test <times> times.', 1)
-	.option('-l, --log-only', 'Don\'t save the HTML report to the file system.');
+	.option('-l, --log-only', 'Don\'t save the HTML report to the file system.')
+	.option('-t, --table', 'Log the performance results as a table where each test gets a new row. This is useful with the --repeat option for easier analysis.');
 
 program.parse(process.argv);
 
@@ -21,6 +23,7 @@ program.parse(process.argv);
 	let url = program.url;
 	const injectCss = program.cssNoAnimate;
 	const reexecuteTimes = parseInt(program.repeat);
+	var table = null;
 
 	try {
 		// verify valid url
@@ -132,23 +135,37 @@ program.parse(process.argv);
 			port: (new URL(browser.wsEndpoint())).port,
 			output: 'html',
 			logLevel: 'silent', // 'info', 'silent', 'verbose'
-			// blockedUrlPatterns: ['*.forter.com']
-			// extraHeaders: {'Link':'<https://ensighten.bhphoto.com>; rel=preconnect; crossorigin'}
 		}).catch(function(error){
 			console.log('failed lighthouse execution');
 			console.log(error);
 		});
 
-		// log main metrics
-		console.log(`\nLighthouse score (Run ${i}):`);
-		console.log(`${Object.values(lhr.categories).map(c => c.title + ': ' + c.score).join(', \n')}`);
+		const performanceCat = lhr.categories.performance;
+		const performanceSubCats = performanceCat.auditRefs.filter(r => r.weight > 0);
 
-		// log performance breakdown metrics (based on weight)
-		console.log(lhr.categories.performance.auditRefs.filter(r => r.weight > 0).map(r => '  ' + lhr.audits[r.id].title + ': ' + lhr.audits[r.id].displayValue).join('\n'));
+		if(program.table){
+			if(!table){
+				table = new Table({
+					head: ['', 'Performance Score', ...performanceSubCats.map(r => lhr.audits[r.id].title)],
+					//colWidths: [100, 200]
+				});
+			}
+
+			table.push([`Run ${i}`, performanceCat.score, ...performanceSubCats.map(r => lhr.audits[r.id].displayValue)])
+		}
+		else {
+			// log main metrics
+			console.log(`\nLighthouse score (Run ${i}):`);
+			console.log(`${Object.values(lhr.categories).map(c => c.title + ': ' + c.score).join(', \n')}`);
+
+			// log performance breakdown metrics (based on weight)
+			console.log(performanceSubCats.map(r => '  ' + lhr.audits[r.id].title + ': ' + lhr.audits[r.id].displayValue).join('\n'));
+		}
 
 		if(!program.logOnly){
 			try {
 				fs.writeFileSync(`./report-${i}.html`, report);
+				
 				console.log('');
 				console.log('Report saved to ', path.resolve(`./report-${i}.html`));
 			} catch(e){
@@ -158,4 +175,7 @@ program.parse(process.argv);
 
 		await browser.close();
 	}
+
+	if(table)
+		console.log(table.toString());
 })();
