@@ -9,6 +9,16 @@ const path = require('path');
 const glob = require("glob");
 const Table = require('cli-table');
 
+const shortenedMetricNames = {
+	'Performance': 'Perf',
+	'Largest Contentful Paint': 'LCP',
+	'First Contentful Paint': 'FCP',
+	'Speed Index': 'SI',
+	'Time to Interactive': 'TTI',
+	'Total Blocking Time': 'TBT',
+	'Cumulative Layout Shift': 'CLS'
+};
+
 program
 	.option('-u, --url <url>', "The URL to be tested with Lighthouse.")
 	.option('-c, --cookie [key=value pairs...]', 'Sets a cookie on the page before executing Lighthouse.')
@@ -146,7 +156,9 @@ program.parse(process.argv);
 		if(program.table){
 			if(!table){
 				table = new Table({
-					head: ['', 'Performance Score', ...performanceSubCats.map(r => lhr.audits[r.id].title)],
+					head: ['', 'Perf',
+						...performanceSubCats.map(r => shortenedMetricNames[lhr.audits[r.id].title])
+					],
 					//colWidths: [100, 200]
 				});
 			}
