@@ -10,13 +10,14 @@ const glob = require("glob");
 const Table = require('cli-table');
 
 const shortenedMetricNames = {
-	'Performance': 'Perf',
-	'Largest Contentful Paint': 'LCP',
-	'First Contentful Paint': 'FCP',
-	'Speed Index': 'SI',
-	'Time to Interactive': 'TTI',
-	'Total Blocking Time': 'TBT',
-	'Cumulative Layout Shift': 'CLS'
+	'performance': 'Perf',
+	'largest-contentful-paint': 'LCP',
+	'first-contentful-paint': 'FCP',
+	'speed-index': 'SI',
+	'interactive': 'TTI',
+	'total-blocking-time': 'TBT',
+	'cumulative-layout-shift': 'CLS',
+	'server-response-time': 'TTFB'
 };
 
 program
@@ -66,6 +67,10 @@ program.parse(process.argv);
 		const browser = await puppeteer.launch({
 			headless: false,
 			defaultViewport: null,
+			//executablePath: 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+			args: [
+				//'--user-agent="Mozilla/5.0 (Linux; Android 7.0; Moto G (4)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4143.7 Mobile Safari/537.36"'
+			]
 		}).catch(function(error){
 			console.log('failed to launch puppeteer');
 			console.log(error);
@@ -151,19 +156,19 @@ program.parse(process.argv);
 		});
 
 		const performanceCat = lhr.categories.performance;
-		const performanceSubCats = performanceCat.auditRefs.filter(r => r.weight > 0);
+		const performanceSubCats = performanceCat.auditRefs.filter(r => r.weight > 0 || r.id === 'server-response-time');
 
 		if(program.table){
 			if(!table){
 				table = new Table({
 					head: ['', 'Perf',
-						...performanceSubCats.map(r => shortenedMetricNames[lhr.audits[r.id].title])
+						...performanceSubCats.map(r => shortenedMetricNames[r.id])
 					],
 					//colWidths: [100, 200]
 				});
 			}
 
-			table.push([`Run ${i}`, performanceCat.score, ...performanceSubCats.map(r => lhr.audits[r.id].displayValue)])
+			table.push([`Run ${i}`, performanceCat.score, ...performanceSubCats.map(r => lhr.audits[r.id].displayValue)]);
 		}
 		else {
 			// log main metrics
@@ -181,11 +186,13 @@ program.parse(process.argv);
 				console.log('');
 				console.log('Report saved to ', path.resolve(`./report-${i}.html`));
 			} catch(e){
+				console.log('Error writing report to disc.');
 				console.log(e);
 			}
 		}
 
-		await browser.close();
+		// browser.close() fails and stops the process
+		await browser.process().kill('SIGKILL');
 	}
 
 	if(table)
